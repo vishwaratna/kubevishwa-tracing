@@ -1,0 +1,145 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tracingconfigs.observability.kubevishwa.io
+spec:
+  group: observability.kubevishwa.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+                description: "Enable or disable tracing for the target application"
+              samplingRate:
+                type: number
+                minimum: 0.0
+                maximum: 1.0
+                description: "Sampling rate for traces (0.0 to 1.0)"
+              endpoint:
+                type: string
+                description: "OTLP endpoint for sending traces"
+              serviceName:
+                type: string
+                description: "Service name to use for tracing"
+              namespace:
+                type: string
+                description: "Target namespace for applying tracing configuration"
+              selector:
+                type: object
+                properties:
+                  matchLabels:
+                    type: object
+                    additionalProperties:
+                      type: string
+                description: "Label selector for target pods"
+              headers:
+                type: object
+                additionalProperties:
+                  type: string
+                description: "Additional headers to send with traces"
+              attributes:
+                type: object
+                additionalProperties:
+                  type: string
+                description: "Additional attributes to add to traces"
+              exportTimeout:
+                type: string
+                description: "Timeout for exporting traces (e.g., '30s')"
+              batchTimeout:
+                type: string
+                description: "Timeout for batching traces (e.g., '5s')"
+              maxBatchSize:
+                type: integer
+                minimum: 1
+                description: "Maximum batch size for traces"
+            required:
+            - enabled
+            - endpoint
+            - serviceName
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                enum: ["Pending", "Applied", "Failed"]
+                description: "Current phase of the tracing configuration"
+              message:
+                type: string
+                description: "Human-readable message about the current status"
+              appliedAt:
+                type: string
+                format: date-time
+                description: "Timestamp when the configuration was last applied"
+              targetPods:
+                type: array
+                items:
+                  type: string
+                description: "List of pods that have the tracing configuration applied"
+    additionalPrinterColumns:
+    - name: Enabled
+      type: boolean
+      jsonPath: .spec.enabled
+    - name: Service
+      type: string
+      jsonPath: .spec.serviceName
+    - name: Sampling Rate
+      type: string
+      jsonPath: .spec.samplingRate
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: tracingconfigs
+    singular: tracingconfig
+    kind: TracingConfig
+    shortNames:
+    - tc
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracing-controller
+  namespace: observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tracing-controller
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["observability.kubevishwa.io"]
+  resources: ["tracingconfigs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["observability.kubevishwa.io"]
+  resources: ["tracingconfigs/status"]
+  verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tracing-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tracing-controller
+subjects:
+- kind: ServiceAccount
+  name: tracing-controller
+  namespace: observability

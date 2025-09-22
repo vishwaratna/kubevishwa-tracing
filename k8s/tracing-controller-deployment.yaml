@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracing-controller
+  namespace: observability
+  labels:
+    app: tracing-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tracing-controller
+  template:
+    metadata:
+      labels:
+        app: tracing-controller
+    spec:
+      serviceAccountName: tracing-controller
+      containers:
+      - name: tracing-controller
+        image: tracing-controller:latest
+        imagePullPolicy: Never  # Use local image
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5

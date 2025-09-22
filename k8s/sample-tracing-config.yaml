@@ -1,0 +1,20 @@
+apiVersion: observability.kubevishwa.io/v1
+kind: TracingConfig
+metadata:
+  name: kubevishwa-api-tracing
+  namespace: default
+spec:
+  enabled: true
+  samplingRate: 1.0
+  endpoint: "otel-collector.observability.svc.cluster.local:4317"
+  serviceName: "kubevishwa-api"
+  namespace: "default"
+  selector:
+    matchLabels:
+      app: kubevishwa-api
+  attributes:
+    environment: "development"
+    version: "1.0.0"
+  exportTimeout: "30000"
+  batchTimeout: "5000"
+  maxBatchSize: 512
